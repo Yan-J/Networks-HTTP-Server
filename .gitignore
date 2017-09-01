@@ -1,4 +1,7 @@
 # Prerequisites
+.DS_Store
+echo_client
+echo_server
 *.d
 
 # Object files
