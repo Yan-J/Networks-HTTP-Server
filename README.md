@@ -2,7 +2,7 @@
 Web server to handle HTTP requests
 
 ## Http request format 
-<hr/>
+Example htttp request as seen by a server running on port 8080. Run dumper.py and type in the url 0.0.0.0:8080 to see incoming requests.
 
 ```
 GET / HTTP/1.1
@@ -19,9 +19,8 @@ Cookie: _ga=GA1.1.914736757.1503795000; _gid=GA1.1.1655366945.1505753891; _gat=1
 ```
 
 
-## Annotated Excerpted RFC 2616 Text for CS 5450
-[Annotated RFC 2616 ](https://pages.github.coecis.cornell.edu/cs5450/website/assignments/p1/rfc.txt)
-
+## Annotated Excerpted RFC 2616 Text
+Link to annotated excerpted RFC 2616 text for CS 5450 [Annotated RFC 2616 ](https://pages.github.coecis.cornell.edu/cs5450/website/assignments/p1/rfc.txt)
 
 
 
