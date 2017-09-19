@@ -18,10 +18,12 @@ echo_client:
 	@echo "Compiling echo_client.c"
 	@gcc echo_client.c -o echo_client -Wall -Werror
 	@echo "############### Build Successful ############### \n"
+
 clean:
-	@rm echo_server echo_client
+	@[ -f echo_server ] && rm echo_server || true
+	@[ -f echo_client ] && rm echo_client || true
 	@echo "Removed object files: echo_server, echo_client"
-	@cp log.txt log_old.txt
-	@rm log.txt
+	@[ -f log.txt ] && cp log.txt log_old.txt || true
+	@[ -f log.txt ] && rm log.txt || true
 	@echo "Removed log.txt"
 	@echo "############## Make clean success ############## \n"
