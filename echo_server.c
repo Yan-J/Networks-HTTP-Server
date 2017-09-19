@@ -188,8 +188,9 @@ int main(int argc, char* argv[])
                 }else{
 		    printf("Reading client message size: %ld  \n", readret);
                     // set the string terminating NULL byte on the end of the data read
-                    buf[readret] = '\0';
-                    send(sd , buf , strlen(buf) , 0);
+                    // buf[readret] = '\0';
+		    // Just send the read buffer coontents
+                    send(sd , buf , readret , 0);
                 }
 
 		// Clear buffer after message was sent back to client
