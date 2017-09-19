@@ -2,7 +2,7 @@
 Web server to handle HTTP requests
 
 ## Http request format 
-Example htttp request as seen by a server running on port 8080. Run dumper.py and type in the url 0.0.0.0:8080 to see incoming requests.
+Example htttp request as seen by a server running on port 8080. Run dumper.py and type in the url 0.0.0.0:8080 n your browser to see incoming requests.
 
 ```
 GET / HTTP/1.1
