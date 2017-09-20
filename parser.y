@@ -195,14 +195,14 @@ request_line: token t_sp text t_sp text t_crlf {
 	strcpy(parsing_request->http_version, $5);
 }
 
-/*
-request_header: token ows t_colon ows text ows t_crlf {
+
+request_header_field: token ows t_colon ows text ows t_crlf {
 	YPRINTF("request_Header:\n%s\n%s\n",$1,$5);
   strcpy(parsing_request->headers[parsing_request->header_count].header_name, $1);
 	strcpy(parsing_request->headers[parsing_request->header_count].header_value, $5);
 	parsing_request->header_count++;
 };
-*/
+
 
 /*
  * You need to fill this rule, and you are done! You have all the assembly
@@ -212,27 +212,15 @@ request_header: token ows t_colon ows text ows t_crlf {
  */
 
 
-request_header_host: token ows t_colon ows text ows t_crlf {
-        YPRINTF("request_Header host:\n%s\n%s\n",$1,$5);
-  	strcpy(parsing_request->headers[parsing_request->header_count].header_name, $1);
-        strcpy(parsing_request->headers[parsing_request->header_count].header_value, $5);
-        parsing_request->header_count++;
-};
 
-
-request_header_connection: token ows t_colon ows text ows t_crlf {
-        YPRINTF("request_Header connection:\n%s\n%s\n",$1,$5);
-        strcpy(parsing_request->headers[parsing_request->header_count].header_name, $1);
-        strcpy(parsing_request->headers[parsing_request->header_count].header_value, $5);
-        parsing_request->header_count++;
-};
-
-
-request_header: request_header_host request_header_connection {
+request_header: request_header_field {
+        YPRINTF("parsing_request: Matched Success.\n");
+        return SUCCESS;
+}; 
+| request_header_field request_header{
         YPRINTF("parsing_request: Matched Success.\n");
         return SUCCESS;
 };
-
 
 request: request_line request_header t_crlf{
 	YPRINTF("parsing_request: Matched Success.\n");

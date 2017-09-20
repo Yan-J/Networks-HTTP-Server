@@ -2,6 +2,8 @@
 .DS_Store
 echo_client
 echo_server
+client
+server
 log.txt
 log_old.txt
 *.d

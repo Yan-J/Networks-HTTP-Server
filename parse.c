@@ -49,16 +49,17 @@ Request * parse(char *buffer, int size, int socketFd) {
   //Valid End State
 	if (state == STATE_CRLFCRLF) {
 		Request *request = (Request *) malloc(sizeof(Request));
-    request->header_count=0;
-    //TODO You will need to handle resizing this in parser.y
-    request->headers = (Request_header *) malloc(sizeof(Request_header) * NUM_HEADER_FIELDS);
+    		request->header_count=0;
+    		//TODO You will need to handle resizing this in parser.y
+    		request->headers = (Request_header *) malloc(sizeof(Request_header) * NUM_HEADER_FIELDS);
 		set_parsing_options(buf, i, request);
 
 		if (yyparse() == SUCCESS) {
-      return request;
+      		    return request;
 		}
 	}
   //TODO Handle Malformed Requests
-  printf("Parsing Failed\n");
+  // printf("Parsing Failed\n");
+  return NULL;
 
 }
