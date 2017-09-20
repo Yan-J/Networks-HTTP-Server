@@ -20,11 +20,15 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "parse.h"
 
 #define ECHO_PORT 9999
 #define BUF_SIZE 4096
 #define LOG_FILE "log.txt"
 #define MAX_CONN 1250
+#define MAX_HEADER_SIZE 
 
 
 /************** Global variables **************/
@@ -69,6 +73,51 @@ int close_connection(int index)
     return close_socket(sd);
 }
 
+
+/*
+ * Creates response header
+ */
+int create_response_header(int sd, char *buf)
+{
+    return 0;
+}
+
+
+/*
+ * Creates response body
+ */
+int create_response_body(int sd, char *buf)
+{
+    return 0;
+}
+
+/*
+ * Parse client http request
+ */
+void parse_request(int sd, char *buf, ssize_t read_ret)
+{
+    int index = 0;
+    //Parse the buffer to the parse function. You will need to pass the socket fd and the buffer would need to
+    //be read from that fd
+    Request *request = parse(buf, read_ret, sd);
+
+    //Just printing everything
+    printf("###################################### \n");
+    printf("Http Method %s\n",request->http_method);
+    printf("Http Version %s\n",request->http_version);
+    printf("Http Uri %s\n",request->http_uri);
+
+
+    printf("----------- Request Header -----------\n");
+    for(index = 0;index < request->header_count;index++)
+    {
+        printf("name: %s  |  ",request->headers[index].header_name);
+        printf("value: %s \n",request->headers[index].header_value);
+    }
+
+    printf("###################################### \n");
+
+}
 
 /*
  * Handle http request
@@ -217,6 +266,7 @@ int main(int argc, char* argv[])
 		    close_connection(i);
                 }else{
 		    printf("Reading client message size: %ld  \n", readret);
+		    parse_request(sd, buf, readret);
                     send(sd , buf , readret , 0);
 		    // handle_request(sd, buf)
                 }
