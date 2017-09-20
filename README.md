@@ -54,3 +54,16 @@ Accept-Language: en-US,en;q=0.8
 Cookie: _ga=GA1.1.914736757.1503795000; _gid=GA1.1.1655366945.1505753891; _gat=1
 
 ```
+
+Example request to server from ubuntu linux running firefox
+
+```
+GET / HTTP/1.1
+Host: 127.0.0.1:9999
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0) Gecko/20100101 Firefox/55.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+```

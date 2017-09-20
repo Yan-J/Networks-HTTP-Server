@@ -100,6 +100,8 @@ void parse_request(int sd, char *buf, ssize_t read_ret)
     //Parse the buffer to the parse function. You will need to pass the socket fd and the buffer would need to
     //be read from that fd
     Request *request = parse(buf, read_ret, sd);
+    if(request == NULL)
+	return;
 
     //Just printing everything
     printf("###################################### \n");

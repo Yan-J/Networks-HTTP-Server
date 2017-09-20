@@ -24,6 +24,14 @@ int main(int argc, char **argv){
     //Parse the buffer to the parse function. You will need to pass the socket fd and the buffer would need to
     //be read from that fd
     Request *request = parse(buf,readRet,fd_in);
+    if(request == NULL){
+	printf("Oops something went wrong! \n");
+	printf("###################################### \n");
+	printf("            Bad Request \n");
+	printf("###################################### \n");
+	return;	
+    }
+		
   
     //Just printing everything
     printf("###################################### \n");
