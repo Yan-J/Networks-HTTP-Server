@@ -32,15 +32,22 @@ int client_sockets[MAX_CONN];		/* Array to track all connections */
 int max_sd;				/* Max socket descriptor */
 fd_set readfds;				/* Read file descriptors for incoming conn */
 
-void log_write(char* msg){
+void log_write(char* msg)
+{
     FILE* file_ptr = fopen(LOG_FILE, "a+");
 
-    if(file_ptr != NULL){
+    if(file_ptr != NULL)
+    {
 	fputs(msg, file_ptr);
 	fclose(file_ptr);
     }
 }
 
+
+
+/*
+ * Function to close a server socket
+ */
 int close_socket(int sock)
 {
     if (close(sock))
@@ -51,6 +58,30 @@ int close_socket(int sock)
     return 0;
 }
 
+
+/*
+ * Function to close a client connection
+ */
+int close_connection(int index)
+{
+    int sd = client_sockets[index];
+    client_sockets[index] = 0;
+    return close_socket(sd);
+}
+
+
+/*
+ * Handle http request
+ */
+int handle_request(int sd, char *buf)
+{
+    return 0;   
+}
+
+
+/******************************************************************** 
+ * Server core
+ ********************************************************************/
 int main(int argc, char* argv[])
 {
     int sock, new_socket;
@@ -106,10 +137,8 @@ int main(int argc, char* argv[])
        FD_SET(sock, &readfds);
        max_sd = sock;
 
-	count = 0;
-       /* add Provision for MAX_CONN child sockets */
+       count = 0;
        for(i=0; i<MAX_CONN; i++) {
-            // socket descriptor
             sd = client_sockets[i];
 
             // if socket descriptor is valid then add to read list
@@ -123,13 +152,13 @@ int main(int argc, char* argv[])
                 max_sd = sd;
         }
 
-	//printf("Max Socket FD in use: %d \n", max_sd);
 	printf("Active connections: %d \n", count);
 
 	/* wait for select to return, timeout is NULL - so wait indefinitely */
 	selected_fd = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
 
-	if(selected_fd < 0){
+	if(selected_fd < 0)
+	{
 	    msg = "Select() error \n";
 	    printf("%s", msg);
 	    log_write(msg);
@@ -137,8 +166,10 @@ int main(int argc, char* argv[])
 
 	cli_size = sizeof(cli_addr);
         // If master socket is set, then there is a new incoming connection
-        if(FD_ISSET(sock, &readfds)){
-            if((new_socket = accept(sock, (struct sockaddr *)&cli_addr, (socklen_t*)&cli_size))<0){
+        if(FD_ISSET(sock, &readfds))
+	{
+            if((new_socket = accept(sock, (struct sockaddr *)&cli_addr, (socklen_t*)&cli_size))<0)
+	    {
                 printf("Failed to accept incoming connection!");
                 exit(EXIT_FAILURE);
             }
@@ -162,7 +193,6 @@ int main(int argc, char* argv[])
 		// if position is empty
 		if( client_sockets[i] == 0 ){
                     client_sockets[i] = new_socket;
-                    printf("Adding to list of client_sockets at %d\n" , i);
                     break;
                 }
             }
@@ -177,20 +207,18 @@ int main(int argc, char* argv[])
                 if ((readret = read(sd, buf, BUF_SIZE)) <= 0){
                     // Somebody disconnected, get his details and print
                     getpeername(sd , (struct sockaddr*)&cli_addr , (socklen_t*)&cli_size);
-                    printf("Host disconnected:: ip %s , port %d \n",
-			   inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
 
-                    // Close the socket and mark as 0 in list for reuse
                     printf("Closing connection: ip %s , port %d \n",
                            inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
-                    close(sd);
-                    client_sockets[i] = 0;
+                    
+		    //close(sd);
+                    //client_sockets[i] = 0;
+		    // Close connection
+		    close_connection(i);
                 }else{
 		    printf("Reading client message size: %ld  \n", readret);
-                    // set the string terminating NULL byte on the end of the data read
-                    // buf[readret] = '\0';
-		    // Just send the read buffer coontents
                     send(sd , buf , readret , 0);
+		    // handle_request(sd, buf)
                 }
 
 		// Clear buffer after message was sent back to client
