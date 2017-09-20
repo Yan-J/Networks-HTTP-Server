@@ -1,36 +1,42 @@
-# project-1
+# Simple http server
 Web server to handle HTTP requests
 
-## Commands
-### Running sample parser
-Run command ``` make ``` inside the parser folder to compile parser source.
-Command to run parser: ``` ./example sample_request  ```
-
-### Running sample server
-Run command ``` make ``` inside the project root  folder to compile server source.
-Command to run server: ``` ```
-
-### Running test scripts
-Checkpoint 1 command: ``` python cp1_checker.py  127.0.0.1 9999 20 32 40  50 ```
-
-
-## Install dependencies 
-This project requires Lex and Yacc for compilation. Install the required packages on your development machine.
-
-### Installing LEX && YACC packages in Ubuntu
-To run Lex programs (.l extension) you need to install ```flex```. To run Yacc programs (.y extension) you need to install ```bison' ``` package.
-
-1. Install Lex package
- ``` sudo apt-get install flex ```
-
-2. Install Yacc package
-``` sudo apt-get install bison ```
-
-## Annotated Excerpted RFC 2616 Text
-Link to annotated excerpted RFC 2616 text for Cornell CS 5450 [Annotated RFC 2616 ](./RFC-2616.md)
+## Annotated excerpted RFC 2616 Text
+The http server is based on a subset o fthe RFC 2626 specifictaion. Link to the annotated excerpted RFC 2616 text for Cornell CS 5450 [Annotated RFC 2616 ](./RFC-2616.md)
 
 ## Server Tests file
 Link to tests file [server tests](./tests.md)
+
+
+## Install dependencies 
+This project uses Berkley sockets api for the level networking primitives. It recomended to use a Ubuntu linux or a VM for developement. 
+
+This project requires Lex and Yacc for parser compilation. Install the required packages on your development machine.
+
+
+### Installing LEX && YACC packages in Ubuntu
+To run Lex programs (.l extension) you need to install ```  flex  ```. To run Yacc programs (.y extension) you need to install ```  bison ``` package.
+
+1. Install Lex package
+```   sudo apt-get install flex   ```
+
+2. Install Yacc package
+```   sudo apt-get install bison   ```
+
+
+## Commands
+#### Running parser
+Run command ```  make  ``` inside the parser folder to compile parser source. Use the following command to run the parser: 
+```  ./example sample_request  ```
+
+#### Running server
+Run command ``` make ``` inside the project root  folder to compile server source.
+Command to run server: ``` ./echo_server  ```
+
+#### Running test scripts
+Checkpoint 1 command: ```  python cp1_checker.py  127.0.0.1 9999 20 32 40  50  ```
+
+
 
 ## Http request format 
 Example htttp request as seen by a server running on port 8080. Run dumper.py and type in the url 0.0.0.0:8080 in your browser to see incoming requests.
