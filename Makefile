@@ -25,5 +25,5 @@ clean:
 	@echo "Removed object files: echo_server, echo_client"
 	@[ -f log.txt ] && cp log.txt log_old.txt || true
 	@[ -f log.txt ] && rm log.txt || true
-	@echo "Removed log.txt"
+	@echo "Removed log file: log.txt"
 	@echo "############## Make clean success ############## \n"
