@@ -20,12 +20,12 @@
 #endif
 
 /* yyparse() calls yyerror() on error */
-void yyerror (const char *s);
+ //void yyerror (const char *s);
 
-void set_parsing_options(char *buf, size_t siz, Request *parsing_request);
+ //void set_parsing_options(char *buf, size_t siz, Request *parsing_request);
 
 /* yyparse() calls yylex() to get tokens */
-extern int yylex();
+//extern int yylex();
 
 
 /*

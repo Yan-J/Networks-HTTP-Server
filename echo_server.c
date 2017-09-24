@@ -22,16 +22,18 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
-#include "parse.h"
+#include "server.h"
 #include "http.h"
 
 
 /******************************************************************************
  *                              Server settings                               *
  ******************************************************************************/
+#define DEBUG			1
 #define WWW_PATH		"./static_site/"
 #define ECHO_PORT		9999
 #define TYPE_LEN		64
@@ -42,6 +44,8 @@
 #define MAX_CONN		1250
 #define MAX_HEADER_SIZE 	4096
 #define LOG_BUF_SIZE		1024
+#define FILE_NAME_SIZE		512
+#define FILE_PATH_SIZE		1024
 
 
 /******************************************************************************
@@ -52,6 +56,11 @@ int max_sd;			/* Max socket descriptor */
 fd_set readfds;			/* Read file descriptors for incoming conn */
 char log_buf[LOG_BUF_SIZE];
 
+
+
+/******************************************************************************
+ *                              Helper functions                              *
+ ******************************************************************************/
 void log_write(char* msg)
 {
     FILE* file_ptr = fopen(LOG_FILE, "a+");
@@ -92,6 +101,90 @@ int close_connection(int index)
 }
 
 
+
+/*
+ * Helper function to get requested file type
+ */
+void parse_file_type(char *filename, char *file_type)
+{
+    
+    if (strstr(filename, ".html"))
+        strcpy(file_type, "text/html");
+    else if (strstr(filename, ".css"))
+        strcpy(file_type, "text/css");
+    else if (strstr(filename, ".js"))
+        strcpy(file_type, "application/javascript");
+    else if (strstr(filename, ".gif"))
+        strcpy(file_type, "image/gif");
+    else if (strstr(filename, ".png"))
+        strcpy(file_type, "image/png");
+    else if (strstr(filename, ".jpg") || strstr(filename, "jpeg"))
+        strcpy(file_type, "image/jpeg");
+    else if (strstr(filename, ".wav"))
+        strcpy(file_type, "audio/x-wav");
+    else
+        strcpy(file_type, "text/plain");
+}
+
+
+/*
+ * Helper function to get requested file path
+ */
+int parse_request_URI(Request *request, char *filename)
+{
+    // path of www dir
+    strcpy(filename, WWW_PATH);
+
+    if (!strstr(request->http_uri, "cgi-bin"))
+    {
+        //static res
+        strcat(filename, request->http_uri);
+        if (request->http_uri[strlen(request->http_uri)-1] == '/')
+            strcat(filename, "index.html");
+        return 0;
+    }
+    else{
+        //dynamic res
+        return 1;
+    }
+    return 0;
+}
+
+
+/*
+ * Helper function to check if requested file is valid
+ */
+int validate_request_file(int id, Request *request)
+{
+    struct stat sbuf;
+    char filename[FILE_PATH_SIZE];
+
+    parse_request_URI(request, filename);
+
+    // check if file exist
+    if (stat(filename, &sbuf) < 0)
+    {
+	char * desc = "Requested file could not be found.";
+        handle_request_error(id, request, HTTP_RESPONSE_404, desc);
+        return 0;
+    }
+
+    // check we have permission
+    if ((!S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode))
+    {
+	char * desc = "You do not have permission to access this file.";
+        handle_request_error(id, request, HTTP_RESPONSE_403, desc);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+
+/******************************************************************************
+ *                              HTTP functions                                *
+ ******************************************************************************/
 /*
  * Creates response header
  */
@@ -113,9 +206,49 @@ int create_response_body(int sd, char *buf)
 /*
  * Handle head request
  */
-void handle_head_request(int id,  Request *request)
+int  handle_head_request(int id,  Request *request)
 {
+    struct tm tm;
+    struct stat sbuf;
+    time_t now;
+    char filename[FILE_PATH_SIZE], content[BUF_SIZE];
+    char filetype[TYPE_LEN], tbuf[TYPE_LEN], dbuf[TYPE_LEN]; 
+ 
+   /*
+    if (validate_request_file(id, request) == 0) 
+    {
+	printf("handle_head: FORBIDDEN or NOT FOUND");
+	return 1;
+    }
+   */
+    
+    parse_request_URI(request, filename);
+    stat(filename, &sbuf);
+    parse_file_type(filename, filetype);
+     
+    tm = *gmtime(&sbuf.st_mtime);
+    strftime(tbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+    now = time(0);
+    tm = *gmtime(&now);
+    strftime(dbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
 
+    sprintf(content, "HTTP/1.1 200 OK\r\n");
+    if (client_sockets[id] > 0)
+        sprintf(content, "%sConnection: close\r\n", content);
+    else
+        sprintf(content, "%sConnection: keep-alive\r\n", content);
+
+    sprintf(content, "%sContent-Length: %ld\r\n", content, sbuf.st_size);
+    sprintf(content, "%sContent-Type: %s\r\n", content, filetype);
+    sprintf(content, "%sDate: %s\r\n", content, dbuf);
+    sprintf(content, "%sLast-Modified: %s\r\n", content, tbuf);
+    sprintf(content, "%sServer: Liso/1.0\r\n\r\n", content);
+    send(client_sockets[id], content, strlen(content), 0);
+
+#ifdef DEBUG    
+    printf("Sending response for HEAD: \n  %s\n",content);
+#endif
+    return 0;
 }
 
 
@@ -138,7 +271,7 @@ void handle_post_request(int id,  Request *request)
 
 
 
-void handle_request_error(int id, char *status_code, char *msg, char *desc)
+void handle_request_error(int id, Request *request, char *http_response, char *desc)
 {
     struct tm tm;
     time_t now;
@@ -149,7 +282,7 @@ void handle_request_error(int id, char *status_code, char *msg, char *desc)
     strftime(date_time, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
 
     // response header
-    sprintf(header, "HTTP/1.1 %s %s\r\n", status_code, msg);
+    sprintf(header, "HTTP/1.1 %s \r\n", http_response);
     sprintf(header, "%sDate: %s\r\n", header, date_time);
     sprintf(header, "%sServer: Liso/1.0\r\n", header);
     if (client_sockets[id] != 0) 
@@ -157,16 +290,39 @@ void handle_request_error(int id, char *status_code, char *msg, char *desc)
     sprintf(header, "%sContent-type: text/html\r\n", header);
     sprintf(header, "%sContent-length: %d\r\n\r\n", header, (int)strlen(body));
     
+    if(request == NULL)
+    {
+#ifdef DEBUG
+        printf(" BAD request: response header \n %s", header);
+#endif
+	send(client_sockets[id], header, strlen(header), 0);
+	return;
+    }
+    
+    if(strcasecmp(request->http_method, "HEAD") == 0)
+    {   
+	send(client_sockets[id], header, strlen(header), 0);
+#ifdef DEBUG
+	printf(" HEAD request: response header \n %s", header);
+#endif
+	return;
+    }
+  
+ 
     // response body
     sprintf(body, "<html>\r\n");
     sprintf(body, "%s<body>\r\n", body);
-    sprintf(body, "%s<h4> ERROR - %s </h4>\r\n", body, msg);
+    sprintf(body, "%s<h4> ERROR - %s </h4>\r\n", body, http_response);
     sprintf(body, "%s<br><p>%s</p>\r\n", body, desc);
     sprintf(body, "%s</body>\r\n", body);
     sprintf(body, "%s</html>\r\n", body);
 
     send(client_sockets[id], header, strlen(header), 0);
     send(client_sockets[id], body, strlen(body), 0);
+#ifdef DEBUG
+    printf("Sending header: %s", header);
+    printf("Sending body: %s", body);
+#endif
 }
 
 
@@ -176,20 +332,21 @@ void handle_request_error(int id, char *status_code, char *msg, char *desc)
 void parse_request(int index, int sd, char *buf, ssize_t read_ret)
 {
     int i = 0;
-    //Parse the buffer to the parse function. You will need to pass the socket fd and the buffer would need to
-    //be read from that fd
+
+    //Parse the request
     Request *request = parse(buf, read_ret, sd);
-    printf("parsing request for sd: %d \n", sd);
 	
     // Check if request header is valid
     if(request == NULL)
      {
 	char * description = "Invalid HTTP header!";
-	handle_request_error(index, HTTP_STATUS_505, HTTP_RESPONSE_505, description);
+	handle_request_error(index, request, HTTP_STATUS_505, description);
+	free(request->headers);
+    	free(request);
 	return;
      }
 
-    // Just printing everything
+    /* Just printing everything
     printf("###################################### \n");
     printf("Http Method: %s\n",request->http_method);
     printf("Http Version: %s\n",request->http_version);
@@ -204,13 +361,13 @@ void parse_request(int index, int sd, char *buf, ssize_t read_ret)
     }
 
     printf("###################################### \n");
-   	
+   */	
 
     // Check http version 
     if(strcasecmp(request->http_version, "HTTP/1.1") != 0)
     {
 	char * description = "Liso server only supports HTTP/1.1";
-        handle_request_error(index, HTTP_STATUS_505, HTTP_RESPONSE_505, description);
+        handle_request_error(index, request, HTTP_STATUS_505, description);
         free(request->headers);
         free(request);
 	printf(" Invalid HTTP version \n");
@@ -223,7 +380,7 @@ void parse_request(int index, int sd, char *buf, ssize_t read_ret)
 	strcasecmp(request->http_method, "POST"))
      {
 	char * desc = "Requested method is not supported by liso server.";
-        handle_request_error(index, HTTP_STATUS_501, HTTP_RESPONSE_501, desc);
+        handle_request_error(index, request, HTTP_STATUS_501, desc);
         free(request->headers);
         free(request);
 	printf("Method not supported \n");
@@ -241,14 +398,13 @@ void parse_request(int index, int sd, char *buf, ssize_t read_ret)
     }
     else if(strcasecmp(request->http_method, "POST") == 0)
     {
-	printf(" POST  request \n");
+	printf(" POST request \n");
         handle_post_request(index, request);
     }
 
     // Free memory
     free(request->headers);
     free(request);
-    printf(" Done parsing request for sd: %d \n", sd);
     return;
 }
 
@@ -418,7 +574,7 @@ int main(int argc, char* argv[])
 		    printf("Reading client message size: %ld  \n", readret);
 		    parse_request(i, sd, buf, readret);
 		    //close_connection(i);
-                    send(sd , buf , readret , 0);
+                    // send(sd , buf , readret , 0);
 		    // handle_request(sd, buf)
                 }
 
