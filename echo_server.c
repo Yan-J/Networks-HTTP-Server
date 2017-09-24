@@ -246,8 +246,8 @@ void parse_request(int index, int sd, char *buf, ssize_t read_ret)
     }
 
     // Free memory
-    //free(request->headers);
-    //free(request);
+    free(request->headers);
+    free(request);
     printf(" Done parsing request for sd: %d \n", sd);
     return;
 }
@@ -416,7 +416,7 @@ int main(int argc, char* argv[])
 		    close_connection(i);
                 }else{
 		    printf("Reading client message size: %ld  \n", readret);
-		    //parse_request(i, sd, buf, readret);
+		    parse_request(i, sd, buf, readret);
 		    //close_connection(i);
                     send(sd , buf , readret , 0);
 		    // handle_request(sd, buf)
