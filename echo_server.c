@@ -532,7 +532,7 @@ int main(int argc, char* argv[])
     struct sockaddr_in addr, cli_addr;
     char buf[BUF_SIZE];
 
-    if(argc != 2){
+    if(argc < 2){
 	usage_error();
 	exit(0);	
     }
