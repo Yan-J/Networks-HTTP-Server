@@ -1,20 +1,35 @@
-################################################################################
-# Makefile                                                                     #
-#                                                                              #
-# Description: This file contains the make rules for Recitation 1.             #
-#                                                                              #
-# Authors: Athula Balachandran <abalacha@cs.cmu.edu>,                          #
-#          Wolf Richter <wolf@cs.cmu.edu>                                      #
-#                                                                              #
-################################################################################
+CC=gcc
+CFLAGS=-I.
+DEPS = parse.h y.tab.h
+OBJ = y.tab.o lex.yy.o parse.o example.o
+FLAGS = -g -Wall
+OBJ2 = y.tab.o lex.yy.o parse.o echo_server.o
 
-default: echo_server echo_client
+default:all
 
-echo_server:
-	@gcc echo_server.c -o echo_server -Wall -Werror
+all: example server client
 
-echo_client:
-	@gcc echo_client.c -o echo_client -Wall -Werror
+lex.yy.c: lexer.l
+	flex $^
+
+y.tab.c: parser.y
+	yacc -d $^
+
+%.o: %.c $(DEPS)
+	$(CC) $(FLAGS) -c -o $@ $< $(CFLAGS)
+
+example: $(OBJ)
+	$(CC) -o $@ $^ $(CFLAGS)
+
+server: $(OBJ2)
+	$(CC) -o $@ $^ $(CFLAGS)
+
+client:
+	@gcc echo_client.c -o client -Wall -Werror
+	@echo "############### Build Successful ############### \n"
 
 clean:
-	@rm echo_server echo_client
+	rm -f *~ *.o example lex.yy.c y.tab.c y.tab.h
+	rm -f *~ client server log.txt
+	@echo "############### Make Clean Success ############## \n"
+
