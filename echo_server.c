@@ -47,7 +47,8 @@
 #define LOG_BUF_SIZE		1024
 #define FILE_NAME_SIZE		512
 #define FILE_PATH_SIZE		1024
-
+#define MIN_PORT		1025
+#define MAX_PORT		9999
 
 /******************************************************************************
  *				Global variables			      *
@@ -57,7 +58,7 @@ int max_sd;			/* Max socket descriptor */
 fd_set readfds;			/* Read file descriptors for incoming conn */
 char log_buf[LOG_BUF_SIZE];
 char www_path[FILE_PATH_SIZE];
-
+int server_port = 9999;
 
 /******************************************************************************
  *                              Helper functions                              *
@@ -512,6 +513,11 @@ int handle_request(int sd, char *buf)
 }
 
 
+void usage_error(){
+    printf("### Incorrect parameters  ### \n");
+    printf("command: ./lisod <port> \n");
+    printf("<port> must be between %d - %d \n", MIN_PORT, MAX_PORT);
+}
 
 /******************************************************************************
  *                                Server Core                                 *
@@ -526,6 +532,17 @@ int main(int argc, char* argv[])
     struct sockaddr_in addr, cli_addr;
     char buf[BUF_SIZE];
 
+    if(argc != 2){
+	usage_error();
+	exit(0);	
+    }
+	
+    server_port = (int)strtol(argv[1], (char**)NULL, 10);
+    if(server_port < MIN_PORT || server_port > MAX_PORT)
+    {
+	usage_error();
+	exit(0);
+    }
 
     /* Get current directory */
     sprintf(www_path, "%s",getenv("PWD"));
@@ -551,7 +568,7 @@ int main(int argc, char* argv[])
     }
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(ECHO_PORT);
+    addr.sin_port = htons(server_port);
     addr.sin_addr.s_addr = INADDR_ANY;
 
     /* servers bind sockets to ports---notify the OS they accept connections */
