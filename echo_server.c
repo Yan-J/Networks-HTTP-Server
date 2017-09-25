@@ -23,6 +23,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
@@ -34,7 +35,7 @@
  *                              Server settings                               *
  ******************************************************************************/
 #define DEBUG			1
-#define WWW_PATH		"./static_site/"
+#define WWW_PATH		""
 #define ECHO_PORT		9999
 #define TYPE_LEN		64
 #define BUF_SIZE		8192
@@ -55,7 +56,7 @@ int client_sockets[MAX_CONN];	/* Array to track all connections */
 int max_sd;			/* Max socket descriptor */
 fd_set readfds;			/* Read file descriptors for incoming conn */
 char log_buf[LOG_BUF_SIZE];
-
+char www_path[FILE_PATH_SIZE];
 
 
 /******************************************************************************
@@ -133,7 +134,7 @@ void parse_file_type(char *filename, char *file_type)
 int parse_request_URI(Request *request, char *filename)
 {
     // path of www dir
-    strcpy(filename, WWW_PATH);
+    strcpy(filename, www_path);
 
     if (!strstr(request->http_uri, "cgi-bin"))
     {
@@ -141,6 +142,9 @@ int parse_request_URI(Request *request, char *filename)
         strcat(filename, request->http_uri);
         if (request->http_uri[strlen(request->http_uri)-1] == '/')
             strcat(filename, "index.html");
+#ifdef DEBUG
+	    printf(" Requested file: %s \n", filename);	
+#endif	
         return 0;
     }
     else{
@@ -166,7 +170,7 @@ int validate_request_file(int id, Request *request)
     {
 	char * desc = "Requested file could not be found.";
         handle_request_error(id, request, HTTP_RESPONSE_404, desc);
-        return 0;
+        return -1;
     }
 
     // check we have permission
@@ -174,7 +178,7 @@ int validate_request_file(int id, Request *request)
     {
 	char * desc = "You do not have permission to access this file.";
         handle_request_error(id, request, HTTP_RESPONSE_403, desc);
-        return 0;
+        return -1;
     }
 
     return 1;
@@ -188,8 +192,48 @@ int validate_request_file(int id, Request *request)
 /*
  * Creates response header
  */
-int create_response_header(int sd, char *buf)
+int send_response_header(int id, Request *request)
 {
+    struct tm tm;
+    struct stat sbuf;
+    time_t now;
+    char   filename[BUF_SIZE], content[BUF_SIZE], filetype[TYPE_LEN], tbuf[TYPE_LEN], dbuf[TYPE_LEN]; 
+ 
+    if (validate_request_file(id, request) == -1) 
+    {
+#ifdef DEBUG
+	printf("GET request error: FILE NOT FOUND or Forbidden \n");
+#endif
+	return 1;
+    }
+    
+    parse_request_URI(request, filename);
+    stat(filename, &sbuf);
+    parse_file_type(filename, filetype);
+     
+    tm = *gmtime(&sbuf.st_mtime);
+    strftime(tbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+    now = time(0);
+    tm = *gmtime(&now);
+    strftime(dbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+
+    sprintf(content, "HTTP/1.1 %s \r\n", HTTP_RESPONSE_200);
+    if (client_sockets[id] == 0)
+        sprintf(content, "%sConnection: close\r\n", content);
+    else
+        sprintf(content, "%sConnection: keep-alive\r\n", content);
+
+    sprintf(content, "%sContent-Length: %ld\r\n", content, sbuf.st_size);
+    sprintf(content, "%sContent-Type: %s\r\n", content, filetype);
+    sprintf(content, "%sDate: %s\r\n", content, dbuf);
+    sprintf(content, "%sLast-Modified: %s\r\n", content, tbuf);
+    sprintf(content, "%sServer: Liso/1.0\r\n\r\n", content);
+    send(client_sockets[id], content, strlen(content), 0);
+
+#ifdef DEBUG    
+    printf("GET send header: %s \n", content);
+#endif
+
     return 0;
 }
 
@@ -197,8 +241,32 @@ int create_response_header(int sd, char *buf)
 /*
  * Creates response body
  */
-int create_response_body(int sd, char *buf)
+int send_response_body(int id, Request *request)
 {
+    int fd, filesize;
+    char *ptr;
+    char filename[BUF_SIZE];
+    struct stat sbuf;
+     
+    parse_request_URI(request, filename);
+
+    if ((fd = open(filename, O_RDONLY, 0)) < 0)
+    {
+        printf("Error: Cann't open file \n");
+        return -1;
+    }
+
+    stat(filename, &sbuf);
+
+    filesize = sbuf.st_size;
+    ptr = mmap(0, filesize, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    int cnt = send(client_sockets[id], ptr, filesize, 0); 
+    munmap(ptr, filesize);
+
+#ifdef DEBUG    
+    printf("sent %d bits\n", cnt);
+#endif
     return 0;
 }
 
@@ -214,13 +282,13 @@ int  handle_head_request(int id,  Request *request)
     char filename[FILE_PATH_SIZE], content[BUF_SIZE];
     char filetype[TYPE_LEN], tbuf[TYPE_LEN], dbuf[TYPE_LEN]; 
  
-   /*
-    if (validate_request_file(id, request) == 0) 
+   
+    if (validate_request_file(id, request) == -1) 
     {
-	printf("handle_head: FORBIDDEN or NOT FOUND");
+	printf("Response for HEAD: FORBIDDEN or NOT FOUND \n");
 	return 1;
     }
-   */
+
     
     parse_request_URI(request, filename);
     stat(filename, &sbuf);
@@ -257,7 +325,8 @@ int  handle_head_request(int id,  Request *request)
  */
 void handle_get_request(int id,  Request *request)
 {
-
+    send_response_header(id, request);
+    send_response_body(id, request);
 }
 
 
@@ -266,7 +335,33 @@ void handle_get_request(int id,  Request *request)
  */
 void handle_post_request(int id,  Request *request)
 {
+    struct tm tm;
+    struct stat sbuf;
+    time_t now;
+    char   content[BUF_SIZE], tbuf[TYPE_LEN], dbuf[TYPE_LEN];
 
+    tm = *gmtime(&sbuf.st_mtime);
+    strftime(tbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+    now = time(0);
+    tm = *gmtime(&now);
+    strftime(dbuf, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+
+    sprintf(content, "HTTP/1.1 %s \r\n", HTTP_RESPONSE_200);
+    if (client_sockets[id] == 0)
+        sprintf(content, "%sConnection: close\r\n", content);
+    else
+        sprintf(content, "%sConnection: keep-alive\r\n", content);
+    sprintf(content, "%sContent-Length: 0\r\n", content);
+    sprintf(content, "%sContent-Type: text/html\r\n", content);    
+    sprintf(content, "%sDate: %s\r\n", content, dbuf);
+    sprintf(content, "%sServer: Liso/1.0\r\n\r\n", content);
+    send(client_sockets[id], content, strlen(content), 0);
+
+#ifdef DEBUG    
+   printf("##### POST Response: #####\n %s \n",content);
+#endif
+
+    return ;
 }
 
 
@@ -431,6 +526,12 @@ int main(int argc, char* argv[])
     struct sockaddr_in addr, cli_addr;
     char buf[BUF_SIZE];
 
+
+    /* Get current directory */
+    sprintf(www_path, "%s",getenv("PWD"));
+    strcat(www_path, "/www");
+    printf("path:  %s \n", www_path);
+
     /* Initialize client connections */
     for(i=0; i<MAX_CONN; i++){
 	client_sockets[i] = 0;
@@ -495,11 +596,12 @@ int main(int argc, char* argv[])
             if(sd > max_sd)
                 max_sd = sd;
         }
-
+	
+	/*
 	printf("Active connections: %d \n", count);
 	sprintf(log_buf, "Active connections: %d \n", count);
 	log_write(log_buf);
-
+	*/
 
 	/* wait for select to return, timeout is NULL - so wait indefinitely */
 	selected_fd = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
@@ -523,22 +625,12 @@ int main(int argc, char* argv[])
             }
 
 	    // inform user of socket number - used in send and receive command
-	    printf("New connection::  socket fd=%d , ip: %s , port: %d \n", new_socket,
+	    /* printf("New connection::  socket fd=%d , ip: %s , port: %d \n", new_socket,
 		inet_ntoa(cli_addr.sin_addr) , ntohs(cli_addr.sin_port));
 	    sprintf(log_buf, "New connection::  socket fd=%d , ip: %s , port: %d \n", new_socket,
                 inet_ntoa(cli_addr.sin_addr) , ntohs(cli_addr.sin_port));
             log_write(log_buf);
-
-
-	/*
-	    msg = "Simple Web server version 1.0 \n";
-	    // send new connection greeting message
-	    if( send(new_socket, msg, strlen(msg), 0) != strlen(msg) ){
-		printf("send error");
-	    }
-
-	    puts("Welcome message sent!");
-	*/
+	   */
 
             // add new socket to the first free position in client sockets array
 	    for (i = 0; i < MAX_CONN; i++){
@@ -571,7 +663,6 @@ int main(int argc, char* argv[])
 		    // Close connection
 		    close_connection(i);
                 }else{
-		    printf("Reading client message size: %ld  \n", readret);
 		    parse_request(i, sd, buf, readret);
 		    //close_connection(i);
                     // send(sd , buf , readret , 0);
