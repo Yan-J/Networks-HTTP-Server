@@ -50,6 +50,9 @@
 #define MIN_PORT		1025
 #define MAX_PORT		9999
 
+#define TRUE 1
+#define FALSE 0
+
 /******************************************************************************
  *				Global variables			      *
  ******************************************************************************/
@@ -60,17 +63,31 @@ char log_buf[LOG_BUF_SIZE];
 char www_path[FILE_PATH_SIZE];
 int server_port = 9999;
 
+struct tm tm;
+time_t now;
+char date_time[TYPE_LEN];
 /******************************************************************************
  *                              Helper functions                              *
  ******************************************************************************/
-void log_write(char* msg)
+void log_write(char* msg, int print_time)
 {
     FILE* file_ptr = fopen(LOG_FILE, "a+");
 
+    now = time(0);
+    tm = *gmtime(&now);
+    strftime(date_time, TYPE_LEN, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+
+    char message[LOG_BUF_SIZE];
+
     if(file_ptr != NULL)
     {
-	fputs(msg, file_ptr);
-	fclose(file_ptr);
+        if (print_time == FALSE) {
+            fputs(msg, file_ptr);
+        } else {
+            sprintf(message,"%s %s\r\n", date_time, msg);
+            fputs(message, file_ptr);
+        }
+	    fclose(file_ptr);
     }
 
     memset(log_buf, 0, LOG_BUF_SIZE);
@@ -144,7 +161,9 @@ int parse_request_URI(Request *request, char *filename)
         if (request->http_uri[strlen(request->http_uri)-1] == '/')
             strcat(filename, "index.html");
 #ifdef DEBUG
-	    printf(" Requested file: %s \n", filename);	
+	    printf("Requested file: %s \n", filename);
+        sprintf(log_buf,"Requested file: %s \n", filename);
+        log_write(log_buf, TRUE);
 #endif	
         return 0;
     }
@@ -253,7 +272,7 @@ int send_response_body(int id, Request *request)
 
     if ((fd = open(filename, O_RDONLY, 0)) < 0)
     {
-        printf("Error: Cann't open file \n");
+        printf("Error: Can't open file \n");
         return -1;
     }
 
@@ -442,6 +461,21 @@ void parse_request(int index, int sd, char *buf, ssize_t read_ret)
 	return;
      }
 
+    sprintf(log_buf,"Http Method: %s\n",request->http_method);
+    log_write(log_buf, TRUE);
+
+    //User-Agent
+    for(i = 0; i < request->header_count; i++)
+    {
+        if (strcasecmp(request->headers[i].header_name, "User-Agent") == 0) {
+            sprintf(log_buf, "User-Agent: %s\n", request->headers[i].header_value);
+            log_write(log_buf, TRUE);
+            break;
+        }
+    }
+
+
+
     /* Just printing everything
     printf("###################################### \n");
     printf("Http Method: %s\n",request->http_method);
@@ -555,15 +589,15 @@ int main(int argc, char* argv[])
     }
 
     fprintf(stdout, "############# Starting server ############# \n");
-    char* msg = "############# Starting server ############# \n";
-    log_write(msg);
+    char *msg = "############################# Starting server ############################# \r\n\n";
+    log_write(msg, FALSE);
 
     /* Primary server socket - creates end point for binding */
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1)
     {
         fprintf(stderr, "Failed creating socket.\n");
 	sprintf(log_buf,"Failed creating socket.\n");
-	log_write(log_buf);
+	log_write(log_buf, TRUE);
         return EXIT_FAILURE;
     }
 
@@ -576,7 +610,7 @@ int main(int argc, char* argv[])
         close_socket(sock);
         fprintf(stderr, "Failed binding socket.\n");
 	sprintf(log_buf,"Failed binding socket.\n");
-        log_write(log_buf);
+        log_write(log_buf, TRUE);
         return EXIT_FAILURE;
     }
 
@@ -586,7 +620,7 @@ int main(int argc, char* argv[])
         close_socket(sock);
         fprintf(stderr, "Error listening on socket.\n");
 	sprintf(log_buf,"Error listening on socket.\n");
-        log_write(log_buf);
+        log_write(log_buf, TRUE);
         return EXIT_FAILURE;
     }
 
@@ -626,7 +660,7 @@ int main(int argc, char* argv[])
 	if(selected_fd < 0)
 	{
 	    msg = "Select() error \n";
-	    log_write(msg);
+	    log_write(msg, TRUE);
 	}
 
 	cli_size = sizeof(cli_addr);
@@ -637,7 +671,7 @@ int main(int argc, char* argv[])
 	    {
                 printf("Failed to accept incoming connection! \n");
 		sprintf(log_buf, "Failed to accept incoming connection! \n");
-        	log_write(log_buf);
+        	log_write(log_buf, TRUE);
                 exit(EXIT_FAILURE);
             }
 
@@ -663,23 +697,29 @@ int main(int argc, char* argv[])
         for(i = 0; i < MAX_CONN; i++){
 	    sd = client_sockets[i];
 
+            getpeername(sd , (struct sockaddr*)&cli_addr , (socklen_t*)&cli_size);
+
             if(FD_ISSET(sd, &readfds)){
                 // Check if it was for closing, and also read the incoming message
                 if ((readret = read(sd, buf, BUF_SIZE)) <= 0){
                     // Somebody disconnected, get his details and print
-                    getpeername(sd , (struct sockaddr*)&cli_addr , (socklen_t*)&cli_size);
 
                     printf("Closing connection: ip %s , port %d \n",
                            inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
                     sprintf(log_buf, "Closing connection: ip %s , port %d \n",
                            inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
-            	    log_write(log_buf);
+            	    log_write(log_buf, TRUE);
 
 		    //close(sd);
                     //client_sockets[i] = 0;
 		    // Close connection
 		    close_connection(i);
                 }else{
+                    log_write("########################################################################### \n", FALSE);
+                    sprintf(log_buf, "Client IP: ip %s , port %d \n",
+                            inet_ntoa(cli_addr.sin_addr), ntohs(cli_addr.sin_port));
+                    log_write(log_buf, TRUE);
+
 		    parse_request(i, sd, buf, readret);
 		    //close_connection(i);
                     // send(sd , buf , readret , 0);
