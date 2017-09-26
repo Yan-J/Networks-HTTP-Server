@@ -63,3 +63,13 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+.idea/misc.xml
+
+.idea/modules.xml
+
+.idea/Networks-HTTP-Server2.iml
+
+.idea/vcs.xml
+
+.idea/workspace.xml
