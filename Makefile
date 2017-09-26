@@ -7,7 +7,7 @@ OBJ2 = y.tab.o lex.yy.o parse.o echo_server.o
 
 default:all
 
-all: example server client
+all: example lisod client
 
 lex.yy.c: lexer.l
 	flex $^
@@ -21,7 +21,7 @@ y.tab.c: parser.y
 example: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
 
-server: $(OBJ2)
+lisod: $(OBJ2)
 	$(CC) -o $@ $^ $(CFLAGS)
 
 client:
